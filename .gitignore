@@ -31,7 +31,9 @@ brutespray-output/
 *.json
 *.csv
 *.txt
-!wordlist/*.txt
+
+# Preserve wordlist files
+!wordlist/**/*
 
 # OS specific files
 .DS_Store
