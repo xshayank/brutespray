@@ -158,3 +158,101 @@ func CalcCombinationsCombo(userCh []string, passCh []string) int {
 	totalCombinations = len(users)
 	return totalCombinations
 }
+
+// GetCredentialIterator creates an iterator for streaming credentials
+func GetCredentialIterator(h *Host, user, password, combo, version string, isPasswordOnly bool) (*CredentialIterator, error) {
+	return NewCredentialIterator(h, user, password, combo, version, isPasswordOnly)
+}
+
+// CountCredentials counts total credentials without loading them all into memory
+func CountCredentials(h *Host, user, password, combo, version string, isPasswordOnly bool) int {
+	count := 0
+
+	if combo != "" {
+		// Count combo credentials
+		if IsFile(combo) {
+			file, err := os.Open(combo)
+			if err != nil {
+				fmt.Println("Error opening combo file for counting:", err)
+				return 0
+			}
+			defer file.Close()
+
+			scanner := bufio.NewScanner(file)
+			for scanner.Scan() {
+				count++
+			}
+			if err := scanner.Err(); err != nil {
+				fmt.Println("Error reading combo file for counting:", err)
+				return 0
+			}
+		} else {
+			count = 1 // Single combo value
+		}
+		return count
+	}
+
+	// Count users
+	userCount := 0
+	if isPasswordOnly {
+		userCount = 1 // Password-only services use empty user
+	} else if user != "" {
+		if IsFile(user) {
+			file, err := os.Open(user)
+			if err != nil {
+				fmt.Println("Error opening user file for counting:", err)
+				return 0
+			}
+			defer file.Close()
+
+			scanner := bufio.NewScanner(file)
+			for scanner.Scan() {
+				userCount++
+			}
+			if err := scanner.Err(); err != nil {
+				fmt.Println("Error reading user file for counting:", err)
+				return 0
+			}
+		} else {
+			userCount = 1 // Single user value
+		}
+	} else {
+		// Use default wordlist
+		users := GetUsersFromDefaultWordlist(version, h.Service)
+		userCount = len(users)
+	}
+
+	// Count passwords
+	passCount := 0
+	if password != "" {
+		if IsFile(password) {
+			file, err := os.Open(password)
+			if err != nil {
+				fmt.Println("Error opening password file for counting:", err)
+				return 0
+			}
+			defer file.Close()
+
+			scanner := bufio.NewScanner(file)
+			for scanner.Scan() {
+				passCount++
+			}
+			if err := scanner.Err(); err != nil {
+				fmt.Println("Error reading password file for counting:", err)
+				return 0
+			}
+		} else {
+			passCount = 1 // Single password value
+		}
+	} else {
+		if UseEmptyPassword {
+			passCount = 1 // Single empty password
+		} else {
+			// Use default wordlist
+			passwords := GetPasswordsFromDefaultWordlist(version, h.Service)
+			passCount = len(passwords)
+		}
+	}
+
+	return userCount * passCount
+}
