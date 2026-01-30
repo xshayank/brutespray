@@ -1,4 +1,4 @@
-module github.com/x90skysn3k/brutespray
+module github.com/xshayank/brutespray
 
 go 1.24.0
 
