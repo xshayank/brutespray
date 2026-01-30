@@ -180,7 +180,11 @@ func CountCredentials(h *Host, user, password, combo, version string, isPassword
 
 			scanner := bufio.NewScanner(file)
 			for scanner.Scan() {
-				count++
+				line := scanner.Text()
+				splits := strings.SplitN(line, ":", 2)
+				if len(splits) == 2 {
+					count++ // Only count valid combo lines
+				}
 			}
 			if err := scanner.Err(); err != nil {
 				fmt.Fprintf(os.Stderr, "Error reading combo file for counting: %v\n", err)

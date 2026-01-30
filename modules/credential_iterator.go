@@ -25,6 +25,9 @@ type CredentialIterator struct {
 	comboFile    *os.File
 	comboScanner *bufio.Scanner
 
+	// Store original file paths for reopening if needed
+	passwordFilePath string
+
 	// Current values
 	currentUser     string
 	currentPassword string
@@ -68,22 +71,29 @@ func (ci *CredentialIterator) initialize() error {
 		return ci.initializeCombo()
 	}
 
-	// Initialize users
-	if ci.user != "" {
-		if IsFile(ci.user) {
-			file, err := os.Open(ci.user)
-			if err != nil {
-				return fmt.Errorf("error opening user file: %w", err)
-			}
-			ci.userFile = file
-			ci.userScanner = bufio.NewScanner(file)
-		} else {
-			ci.users = []string{ci.user}
-		}
+	// For password-only services, skip user initialization
+	if ci.isPasswordOnly {
+		ci.users = []string{""}
+		ci.userIndex = 0
+		ci.currentUser = ""
 	} else {
-		// Use default wordlist
-		ci.useDefaultUsers = true
-		ci.users = GetUsersFromDefaultWordlist(ci.version, ci.host.Service)
+		// Initialize users
+		if ci.user != "" {
+			if IsFile(ci.user) {
+				file, err := os.Open(ci.user)
+				if err != nil {
+					return fmt.Errorf("error opening user file: %w", err)
+				}
+				ci.userFile = file
+				ci.userScanner = bufio.NewScanner(file)
+			} else {
+				ci.users = []string{ci.user}
+			}
+		} else {
+			// Use default wordlist
+			ci.useDefaultUsers = true
+			ci.users = GetUsersFromDefaultWordlist(ci.version, ci.host.Service)
+		}
 	}
 
 	// Initialize passwords
@@ -95,6 +105,7 @@ func (ci *CredentialIterator) initialize() error {
 				return fmt.Errorf("error opening password file: %w", err)
 			}
 			ci.passwordFile = file
+			ci.passwordFilePath = ci.password // Store path for potential reopening
 			ci.passScanner = bufio.NewScanner(file)
 		} else {
 			ci.passwords = []string{ci.password}
@@ -108,13 +119,6 @@ func (ci *CredentialIterator) initialize() error {
 			ci.useDefaultPass = true
 			ci.passwords = GetPasswordsFromDefaultWordlist(ci.version, ci.host.Service)
 		}
-	}
-
-	// For password-only services, we don't need users
-	if ci.isPasswordOnly {
-		ci.users = []string{""}
-		ci.userIndex = 0
-		ci.currentUser = ""
 	}
 
 	return nil
@@ -146,6 +150,7 @@ func (ci *CredentialIterator) Next() (user, password string, ok bool) {
 	if !ci.initialized {
 		if err := ci.initialize(); err != nil {
 			fmt.Fprintf(os.Stderr, "Error initializing credential iterator: %v\n", err)
+			ci.done = true // Prevent retry attempts after initialization failure
 			return "", "", false
 		}
 	}
@@ -173,8 +178,8 @@ func (ci *CredentialIterator) nextCombo() (user, password string, ok bool) {
 		// Reading from file
 		for ci.comboScanner.Scan() {
 			line := ci.comboScanner.Text()
-			if strings.Contains(line, ":") {
-				splits := strings.SplitN(line, ":", 2)
+			splits := strings.SplitN(line, ":", 2)
+			if len(splits) == 2 {
 				return splits[0], splits[1], true
 			} else {
 				// Skip invalid lines with a warning instead of terminating
@@ -313,15 +318,22 @@ func (ci *CredentialIterator) resetPasswords() {
 		if ci.passwordFile != nil {
 			_, err := ci.passwordFile.Seek(0, 0)
 			if err != nil {
-				// If seek fails, try to reopen the file
-				ci.passwordFile.Close()
-				file, err := os.Open(ci.password)
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "Error reopening password file: %v\n", err)
+				// If seek fails and we have the file path, try to reopen
+				if ci.passwordFilePath != "" {
+					ci.passwordFile.Close()
+					file, err := os.Open(ci.passwordFilePath)
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "Error reopening password file: %v\n", err)
+						ci.done = true
+						return
+					}
+					ci.passwordFile = file
+				} else {
+					// No file path stored, can't reopen
+					fmt.Fprintf(os.Stderr, "Error seeking password file and no path to reopen: %v\n", err)
 					ci.done = true
 					return
 				}
-				ci.passwordFile = file
 			}
 			ci.passScanner = bufio.NewScanner(ci.passwordFile)
 		}
@@ -334,28 +346,39 @@ func (ci *CredentialIterator) resetPasswords() {
 
 // Close cleans up file handles
 func (ci *CredentialIterator) Close() error {
-	var lastErr error
+	var errors []error
 
 	if ci.userFile != nil {
 		if err := ci.userFile.Close(); err != nil {
-			lastErr = err
+			errors = append(errors, fmt.Errorf("error closing user file: %w", err))
 		}
 		ci.userFile = nil
 	}
 
 	if ci.passwordFile != nil {
 		if err := ci.passwordFile.Close(); err != nil {
-			lastErr = err
+			errors = append(errors, fmt.Errorf("error closing password file: %w", err))
 		}
 		ci.passwordFile = nil
 	}
 
 	if ci.comboFile != nil {
 		if err := ci.comboFile.Close(); err != nil {
-			lastErr = err
+			errors = append(errors, fmt.Errorf("error closing combo file: %w", err))
 		}
 		ci.comboFile = nil
 	}
 
-	return lastErr
+	if len(errors) > 0 {
+		// Return the first error, but log all errors to stderr
+		for i, err := range errors {
+			if i == 0 {
+				continue // Will return this one
+			}
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+		}
+		return errors[0]
+	}
+
+	return nil
 }
