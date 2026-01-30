@@ -180,6 +180,7 @@ func CountCredentials(h *Host, user, password, combo, version string, isPassword
 			defer file.Close()
 
 			scanner := bufio.NewScanner(file)
+			scanner.Buffer(make([]byte, 64*1024), 1024*1024) // 64KB buffer, 1MB max line length
 			for scanner.Scan() {
 				line := scanner.Text()
 				splits := strings.SplitN(line, ":", 2)
