@@ -448,8 +448,11 @@ func (wp *WorkerPool) ProcessHost(host modules.Host, service string, combo strin
 
 	// Stream credentials using iterator to avoid loading all into memory
 	isPasswordOnly := service == "vnc" || service == "snmp"
+
+	fmt.Fprintf(os.Stderr, "[DEBUG] Creating credential iterator for %s:%d\n", host.Host, host.Port)
 	iter, err := modules.GetCredentialIterator(&host, user, password, combo, version, isPasswordOnly)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "[ERROR] Failed to create iterator: %v\n", err)
 		if !NoColorMode {
 			modules.PrintfColored(pterm.FgRed, "[!] Error creating credential iterator for %s:%d: %v\n", host.Host, host.Port, err)
 		} else {
@@ -459,11 +462,20 @@ func (wp *WorkerPool) ProcessHost(host modules.Host, service string, combo strin
 	}
 	defer iter.Close()
 
+	fmt.Fprintf(os.Stderr, "[DEBUG] Starting credential iteration for %s:%d\n", host.Host, host.Port)
+
 	// Stream credentials to job queue as they are generated
+	credentialCount := 0
 	for {
 		u, p, ok := iter.Next()
 		if !ok {
+			fmt.Fprintf(os.Stderr, "[DEBUG] Finished iterating %d credentials for %s:%d\n", credentialCount, host.Host, host.Port)
 			break
+		}
+		credentialCount++
+
+		if credentialCount%1000 == 0 {
+			fmt.Fprintf(os.Stderr, "[DEBUG] Queued %d credentials for %s:%d\n", credentialCount, host.Host, host.Port)
 		}
 
 		// Check if we should stop before processing each credential
