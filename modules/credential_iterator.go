@@ -65,6 +65,9 @@ func (ci *CredentialIterator) initialize() error {
 	if ci.initialized {
 		return nil
 	}
+
+	fmt.Fprintf(os.Stderr, "[DEBUG] Initializing credential iterator for %s:%d\n", ci.host.Host, ci.host.Port)
+
 	ci.initialized = true
 
 	if ci.isComboMode {
@@ -80,6 +83,7 @@ func (ci *CredentialIterator) initialize() error {
 		// Initialize users
 		if ci.user != "" {
 			if IsFile(ci.user) {
+				fmt.Fprintf(os.Stderr, "[DEBUG] Opening user file: %s\n", ci.user)
 				file, err := os.Open(ci.user)
 				if err != nil {
 					return fmt.Errorf("error opening user file: %w", err)
@@ -87,6 +91,7 @@ func (ci *CredentialIterator) initialize() error {
 				ci.userFile = file
 				ci.userScanner = bufio.NewScanner(file)
 				ci.userScanner.Buffer(make([]byte, 64*1024), 1024*1024) // 64KB buffer, 1MB max line length
+				fmt.Fprintf(os.Stderr, "[DEBUG] User file opened successfully\n")
 			} else {
 				ci.users = []string{ci.user}
 			}
@@ -100,6 +105,7 @@ func (ci *CredentialIterator) initialize() error {
 	// Initialize passwords
 	if ci.password != "" {
 		if IsFile(ci.password) {
+			fmt.Fprintf(os.Stderr, "[DEBUG] Opening password file: %s\n", ci.password)
 			file, err := os.Open(ci.password)
 			if err != nil {
 				ci.Close() // Clean up user file if opened
@@ -109,6 +115,7 @@ func (ci *CredentialIterator) initialize() error {
 			ci.passwordFilePath = ci.password // Store path for potential reopening
 			ci.passScanner = bufio.NewScanner(file)
 			ci.passScanner.Buffer(make([]byte, 64*1024), 1024*1024) // 64KB buffer, 1MB max line length
+			fmt.Fprintf(os.Stderr, "[DEBUG] Password file opened successfully\n")
 		} else {
 			ci.passwords = []string{ci.password}
 		}
@@ -129,6 +136,7 @@ func (ci *CredentialIterator) initialize() error {
 // initializeCombo sets up combo mode iteration
 func (ci *CredentialIterator) initializeCombo() error {
 	if IsFile(ci.combo) {
+		fmt.Fprintf(os.Stderr, "[DEBUG] Opening combo file: %s\n", ci.combo)
 		file, err := os.Open(ci.combo)
 		if err != nil {
 			return fmt.Errorf("error opening combo file: %w", err)
@@ -136,6 +144,7 @@ func (ci *CredentialIterator) initializeCombo() error {
 		ci.comboFile = file
 		ci.comboScanner = bufio.NewScanner(file)
 		ci.comboScanner.Buffer(make([]byte, 64*1024), 1024*1024) // 64KB buffer, 1MB max line length
+		fmt.Fprintf(os.Stderr, "[DEBUG] Combo file opened successfully\n")
 	} else {
 		// Single combo value
 		splits := strings.SplitN(ci.combo, ":", 2)
@@ -186,12 +195,14 @@ func (ci *CredentialIterator) nextCombo() (user, password string, ok bool) {
 				return splits[0], splits[1], true
 			} else {
 				// Skip invalid lines with a warning instead of terminating
-				fmt.Fprintf(os.Stderr, "Warning: skipping invalid format in combo file: %s\n", line)
+				fmt.Fprintf(os.Stderr, "[WARNING] Skipping invalid format in combo file: %s\n", line)
 				continue
 			}
 		}
 		if err := ci.comboScanner.Err(); err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading combo file: %v\n", err)
+			fmt.Fprintf(os.Stderr, "[ERROR] Error reading combo file: %v\n", err)
+		} else {
+			fmt.Fprintf(os.Stderr, "[DEBUG] Reached end of combo file\n")
 		}
 		ci.done = true
 		return "", "", false
@@ -217,7 +228,9 @@ func (ci *CredentialIterator) nextPasswordOnly() (user, password string, ok bool
 			return "", ci.passScanner.Text(), true
 		}
 		if err := ci.passScanner.Err(); err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading password file: %v\n", err)
+			fmt.Fprintf(os.Stderr, "[ERROR] Error reading password file: %v\n", err)
+		} else {
+			fmt.Fprintf(os.Stderr, "[DEBUG] Reached end of password file\n")
 		}
 		ci.done = true
 		return "", "", false
@@ -239,9 +252,11 @@ func (ci *CredentialIterator) nextStandard() (user, password string, ok bool) {
 	// If we need to advance to next user
 	if ci.currentUser == "" {
 		if !ci.nextUser() {
+			fmt.Fprintf(os.Stderr, "[DEBUG] No more users available\n")
 			ci.done = true
 			return "", "", false
 		}
+		fmt.Fprintf(os.Stderr, "[DEBUG] Processing user: %s\n", ci.currentUser)
 	}
 
 	// Try to get next password for current user
@@ -275,7 +290,9 @@ func (ci *CredentialIterator) nextUser() bool {
 			return true
 		}
 		if err := ci.userScanner.Err(); err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading user file: %v\n", err)
+			fmt.Fprintf(os.Stderr, "[ERROR] Error reading user file: %v\n", err)
+		} else {
+			fmt.Fprintf(os.Stderr, "[DEBUG] Reached end of user file\n")
 		}
 		return false
 	}
@@ -299,7 +316,9 @@ func (ci *CredentialIterator) nextPassword() bool {
 			return true
 		}
 		if err := ci.passScanner.Err(); err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading password file: %v\n", err)
+			fmt.Fprintf(os.Stderr, "[ERROR] Error reading password file: %v\n", err)
+		} else {
+			fmt.Fprintf(os.Stderr, "[DEBUG] Reached end of password file\n")
 		}
 		return false
 	}
