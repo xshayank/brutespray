@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/multiplay/go-ts3"
-	"github.com/x90skysn3k/brutespray/modules"
+	"github.com/xshayank/brutespray/modules"
 )
 
 func BruteTeamSpeak(host string, port int, user, password string, timeout time.Duration, cm *modules.ConnectionManager) (bool, bool) {

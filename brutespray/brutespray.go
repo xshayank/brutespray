@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/pterm/pterm"
-	"github.com/x90skysn3k/brutespray/banner"
-	"github.com/x90skysn3k/brutespray/brute"
-	"github.com/x90skysn3k/brutespray/modules"
+	"github.com/xshayank/brutespray/banner"
+	"github.com/xshayank/brutespray/brute"
+	"github.com/xshayank/brutespray/modules"
 )
 
 var masterServiceList = []string{"ssh", "ftp", "smtp", "mssql", "telnet", "smbnt", "postgres", "imap", "pop3", "snmp", "mysql", "vmauthd", "asterisk", "vnc", "mongodb", "nntp", "oracle", "teamspeak", "xmpp", "rdp", "http", "https"}

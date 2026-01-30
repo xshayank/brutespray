@@ -6,7 +6,7 @@ import (
 	"time"
 
 	_ "github.com/sijms/go-ora/v2"
-	"github.com/x90skysn3k/brutespray/modules"
+	"github.com/xshayank/brutespray/modules"
 )
 
 func BruteOracle(host string, port int, user, password string, timeout time.Duration, cm *modules.ConnectionManager) (bool, bool) {

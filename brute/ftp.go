@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/jlaffaye/ftp"
-	"github.com/x90skysn3k/brutespray/modules"
+	"github.com/xshayank/brutespray/modules"
 )
 
 func BruteFTP(host string, port int, user, password string, timeout time.Duration, cm *modules.ConnectionManager) (bool, bool) {

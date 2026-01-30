@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/x90skysn3k/brutespray/modules"
+	"github.com/xshayank/brutespray/modules"
 )
 
 func ClearMaps() {

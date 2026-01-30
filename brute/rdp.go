@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/x90skysn3k/brutespray/modules" // Assuming this package is available
+	"github.com/xshayank/brutespray/modules" // Assuming this package is available
 	"github.com/x90skysn3k/grdp/core"
 	"github.com/x90skysn3k/grdp/glog"
 	"github.com/x90skysn3k/grdp/protocol/nla"
