@@ -87,7 +87,7 @@ func NewHostWorkerPool(host modules.Host, workers int, progressCh chan int) *Hos
 		host:          host,
 		workers:       workers,
 		targetWorkers: workers,
-		jobQueue:      make(chan Credential, workers*10), // Smaller buffer per host
+		jobQueue:      make(chan Credential, workers*2), // Smaller buffer since we stream credentials
 		progressCh:    progressCh,
 		stopChan:      make(chan struct{}),
 	}
@@ -446,88 +446,47 @@ func (wp *WorkerPool) ProcessHost(host modules.Host, service string, combo strin
 		fmt.Printf("[*] Processing host: %s:%d (%s) with %d threads\n", host.Host, host.Port, host.Service, hostPool.workers)
 	}
 
-	// Generate and queue all credentials for this host
-	if combo != "" {
-		users, passwords := modules.GetUsersAndPasswordsCombo(&host, combo, version)
-		for i := range users {
-			// Check if we should stop before processing each credential
-			select {
-			case <-wp.globalStopChan:
-				return
-			case <-hostPool.stopChan:
-				return
-			default:
-			}
-
-			cred := Credential{
-				Host:     host,
-				User:     users[i],
-				Password: passwords[i],
-				Service:  service,
-			}
-			select {
-			case hostPool.jobQueue <- cred:
-			case <-hostPool.stopChan:
-				return
-			case <-wp.globalStopChan:
-				return
-			}
-		}
-	} else {
-		if service == "vnc" || service == "snmp" {
-			_, passwords := modules.GetUsersAndPasswords(&host, user, password, version)
-			for _, p := range passwords {
-				// Check if we should stop before processing each credential
-				select {
-				case <-wp.globalStopChan:
-					return
-				case <-hostPool.stopChan:
-					return
-				default:
-				}
-
-				cred := Credential{
-					Host:     host,
-					User:     "",
-					Password: p,
-					Service:  service,
-				}
-				select {
-				case hostPool.jobQueue <- cred:
-				case <-hostPool.stopChan:
-					return
-				case <-wp.globalStopChan:
-					return
-				}
-			}
+	// Stream credentials using iterator to avoid loading all into memory
+	isPasswordOnly := service == "vnc" || service == "snmp"
+	iter, err := modules.GetCredentialIterator(&host, user, password, combo, version, isPasswordOnly)
+	if err != nil {
+		if !NoColorMode {
+			modules.PrintfColored(pterm.FgRed, "[!] Error creating credential iterator for %s:%d: %v\n", host.Host, host.Port, err)
 		} else {
-			users, passwords := modules.GetUsersAndPasswords(&host, user, password, version)
-			for _, u := range users {
-				for _, p := range passwords {
-					// Check if we should stop before processing each credential
-					select {
-					case <-wp.globalStopChan:
-						return
-					case <-hostPool.stopChan:
-						return
-					default:
-					}
+			fmt.Printf("[!] Error creating credential iterator for %s:%d: %v\n", host.Host, host.Port, err)
+		}
+		return
+	}
+	defer iter.Close()
 
-					cred := Credential{
-						Host:     host,
-						User:     u,
-						Password: p,
-						Service:  service,
-					}
-					select {
-					case hostPool.jobQueue <- cred:
-					case <-hostPool.stopChan:
-						return
-					case <-wp.globalStopChan:
-						return
-					}
-				}
-			}
+	// Stream credentials to job queue as they are generated
+	for {
+		u, p, ok := iter.Next()
+		if !ok {
+			break
+		}
+
+		// Check if we should stop before processing each credential
+		select {
+		case <-wp.globalStopChan:
+			return
+		case <-hostPool.stopChan:
+			return
+		default:
+		}
+
+		cred := Credential{
+			Host:     host,
+			User:     u,
+			Password: p,
+			Service:  service,
+		}
+		select {
+		case hostPool.jobQueue <- cred:
+		case <-hostPool.stopChan:
+			return
+		case <-wp.globalStopChan:
+			return
 		}
 	}
 
@@ -715,18 +674,10 @@ func Execute() {
 						modules.PrintWarningBeta(h.Service)
 					}
 				}
-				if *combo != "" {
-					users, passwords := modules.GetUsersAndPasswordsCombo(&h, *combo, version)
-					totalCombinations += modules.CalcCombinationsCombo(users, passwords)
-				} else {
-					if service == "vnc" || service == "snmp" {
-						_, passwords := modules.GetUsersAndPasswords(&h, *user, *password, version)
-						totalCombinations += modules.CalcCombinationsPass(passwords)
-					} else {
-						users, passwords := modules.GetUsersAndPasswords(&h, *user, *password, version)
-						totalCombinations += modules.CalcCombinations(users, passwords)
-					}
-				}
+				// Use iterator-based counting to avoid loading all credentials into memory
+				isPasswordOnly := service == "vnc" || service == "snmp"
+				count := modules.CountCredentials(&h, *user, *password, *combo, version, isPasswordOnly)
+				totalCombinations += count
 			}
 		}
 	}
