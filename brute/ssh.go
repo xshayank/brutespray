@@ -5,7 +5,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/x90skysn3k/brutespray/modules"
+	"github.com/xshayank/brutespray/modules"
 	"golang.org/x/crypto/ssh"
 )
 

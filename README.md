@@ -1,6 +1,6 @@
 # Brutespray
 
-![Version](https://img.shields.io/badge/Version-2.4.1-red)[![goreleaser](https://github.com/x90skysn3k/brutespray/actions/workflows/release.yml/badge.svg)](https://github.com/x90skysn3k/brutespray/actions/workflows/release.yml)[![Go Report Card](https://goreportcard.com/badge/github.com/x90skysn3k/brutespray)](https://goreportcard.com/report/github.com/x90skysn3k/brutespray)
+![Version](https://img.shields.io/badge/Version-2.4.1-red)[![goreleaser](https://github.com/xshayank/brutespray/actions/workflows/release.yml/badge.svg)](https://github.com/xshayank/brutespray/actions/workflows/release.yml)[![Go Report Card](https://goreportcard.com/badge/github.com/xshayank/brutespray)](https://goreportcard.com/report/github.com/xshayank/brutespray)
 
 Created by: Shane Young/@t1d3nio && Jacob Robles/@shellfail 
 
@@ -14,10 +14,10 @@ Brutespray has been re-written in Golang, eliminating the requirement for additi
 # Install
 
 ```
-go install github.com/x90skysn3k/brutespray@latest
+go install github.com/xshayank/brutespray@latest
 ```
 
-[Release Binaries](https://github.com/x90skysn3k/brutespray/releases)
+[Release Binaries](https://github.com/xshayank/brutespray/releases)
 
 To Build:
 
@@ -269,4 +269,4 @@ user4:pass1
 
 # Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=x90skysn3k/brutespray&type=Date)](https://star-history.com/#x90skysn3k/brutespray&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=xshayank/brutespray&type=Date)](https://star-history.com/#xshayank/brutespray&Date)

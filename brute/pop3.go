@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/knadh/go-pop3"
-	"github.com/x90skysn3k/brutespray/modules"
+	"github.com/xshayank/brutespray/modules"
 )
 
 func BrutePOP3(host string, port int, user, password string, timeout time.Duration, cm *modules.ConnectionManager) (bool, bool) {

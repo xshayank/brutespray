@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/gosnmp/gosnmp"
-	"github.com/x90skysn3k/brutespray/modules"
+	"github.com/xshayank/brutespray/modules"
 )
 
 func BruteSNMP(host string, port int, user, password string, timeout time.Duration, cm *modules.ConnectionManager) (bool, bool) {

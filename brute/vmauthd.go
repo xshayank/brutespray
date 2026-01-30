@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/x90skysn3k/brutespray/modules"
+	"github.com/xshayank/brutespray/modules"
 )
 
 func BruteVMAuthd(host string, port int, user, password string, timeout time.Duration, cm *modules.ConnectionManager) (bool, bool) {
