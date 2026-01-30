@@ -145,7 +145,7 @@ func (ci *CredentialIterator) initializeCombo() error {
 func (ci *CredentialIterator) Next() (user, password string, ok bool) {
 	if !ci.initialized {
 		if err := ci.initialize(); err != nil {
-			fmt.Printf("Error initializing credential iterator: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error initializing credential iterator: %v\n", err)
 			return "", "", false
 		}
 	}
@@ -171,19 +171,19 @@ func (ci *CredentialIterator) Next() (user, password string, ok bool) {
 func (ci *CredentialIterator) nextCombo() (user, password string, ok bool) {
 	if ci.comboScanner != nil {
 		// Reading from file
-		if ci.comboScanner.Scan() {
+		for ci.comboScanner.Scan() {
 			line := ci.comboScanner.Text()
 			if strings.Contains(line, ":") {
 				splits := strings.SplitN(line, ":", 2)
 				return splits[0], splits[1], true
 			} else {
-				fmt.Printf("Invalid format in combo file: %s\n", line)
-				ci.done = true
-				return "", "", false
+				// Skip invalid lines with a warning instead of terminating
+				fmt.Fprintf(os.Stderr, "Warning: skipping invalid format in combo file: %s\n", line)
+				continue
 			}
 		}
 		if err := ci.comboScanner.Err(); err != nil {
-			fmt.Printf("Error reading combo file: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error reading combo file: %v\n", err)
 		}
 		ci.done = true
 		return "", "", false
@@ -209,7 +209,7 @@ func (ci *CredentialIterator) nextPasswordOnly() (user, password string, ok bool
 			return "", ci.passScanner.Text(), true
 		}
 		if err := ci.passScanner.Err(); err != nil {
-			fmt.Printf("Error reading password file: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error reading password file: %v\n", err)
 		}
 		ci.done = true
 		return "", "", false
@@ -267,7 +267,7 @@ func (ci *CredentialIterator) nextUser() bool {
 			return true
 		}
 		if err := ci.userScanner.Err(); err != nil {
-			fmt.Printf("Error reading user file: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error reading user file: %v\n", err)
 		}
 		return false
 	}
@@ -291,7 +291,7 @@ func (ci *CredentialIterator) nextPassword() bool {
 			return true
 		}
 		if err := ci.passScanner.Err(); err != nil {
-			fmt.Printf("Error reading password file: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error reading password file: %v\n", err)
 		}
 		return false
 	}
@@ -309,17 +309,22 @@ func (ci *CredentialIterator) nextPassword() bool {
 // resetPasswords resets password iteration to start
 func (ci *CredentialIterator) resetPasswords() {
 	if ci.passScanner != nil {
-		// Need to reopen and recreate scanner for file-based passwords
+		// For file-based passwords, seek back to beginning if possible
 		if ci.passwordFile != nil {
-			ci.passwordFile.Close()
+			_, err := ci.passwordFile.Seek(0, 0)
+			if err != nil {
+				// If seek fails, try to reopen the file
+				ci.passwordFile.Close()
+				file, err := os.Open(ci.password)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Error reopening password file: %v\n", err)
+					ci.done = true
+					return
+				}
+				ci.passwordFile = file
+			}
+			ci.passScanner = bufio.NewScanner(ci.passwordFile)
 		}
-		file, err := os.Open(ci.password)
-		if err != nil {
-			fmt.Printf("Error reopening password file: %v\n", err)
-			return
-		}
-		ci.passwordFile = file
-		ci.passScanner = bufio.NewScanner(file)
 	} else {
 		// Just reset index for slice-based passwords
 		ci.passIndex = 0

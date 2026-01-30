@@ -173,7 +173,7 @@ func CountCredentials(h *Host, user, password, combo, version string, isPassword
 		if IsFile(combo) {
 			file, err := os.Open(combo)
 			if err != nil {
-				fmt.Println("Error opening combo file for counting:", err)
+				fmt.Fprintf(os.Stderr, "Error opening combo file for counting: %v\n", err)
 				return 0
 			}
 			defer file.Close()
@@ -183,7 +183,7 @@ func CountCredentials(h *Host, user, password, combo, version string, isPassword
 				count++
 			}
 			if err := scanner.Err(); err != nil {
-				fmt.Println("Error reading combo file for counting:", err)
+				fmt.Fprintf(os.Stderr, "Error reading combo file for counting: %v\n", err)
 				return 0
 			}
 		} else {
@@ -200,7 +200,7 @@ func CountCredentials(h *Host, user, password, combo, version string, isPassword
 		if IsFile(user) {
 			file, err := os.Open(user)
 			if err != nil {
-				fmt.Println("Error opening user file for counting:", err)
+				fmt.Fprintf(os.Stderr, "Error opening user file for counting: %v\n", err)
 				return 0
 			}
 			defer file.Close()
@@ -210,7 +210,7 @@ func CountCredentials(h *Host, user, password, combo, version string, isPassword
 				userCount++
 			}
 			if err := scanner.Err(); err != nil {
-				fmt.Println("Error reading user file for counting:", err)
+				fmt.Fprintf(os.Stderr, "Error reading user file for counting: %v\n", err)
 				return 0
 			}
 		} else {
@@ -228,7 +228,7 @@ func CountCredentials(h *Host, user, password, combo, version string, isPassword
 		if IsFile(password) {
 			file, err := os.Open(password)
 			if err != nil {
-				fmt.Println("Error opening password file for counting:", err)
+				fmt.Fprintf(os.Stderr, "Error opening password file for counting: %v\n", err)
 				return 0
 			}
 			defer file.Close()
@@ -238,7 +238,7 @@ func CountCredentials(h *Host, user, password, combo, version string, isPassword
 				passCount++
 			}
 			if err := scanner.Err(); err != nil {
-				fmt.Println("Error reading password file for counting:", err)
+				fmt.Fprintf(os.Stderr, "Error reading password file for counting: %v\n", err)
 				return 0
 			}
 		} else {
