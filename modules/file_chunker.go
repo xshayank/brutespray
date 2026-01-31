@@ -268,7 +268,7 @@ func ReadLinesFromChunkedFile(cf *ChunkedFile, callback func(string) error) erro
 
 		scanner := bufio.NewScanner(file)
 		scanner.Buffer(make([]byte, DefaultScannerBufferSize), MaxLineLength)
-		
+
 		for scanner.Scan() {
 			if err := callback(scanner.Text()); err != nil {
 				file.Close()

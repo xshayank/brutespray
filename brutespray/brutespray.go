@@ -683,31 +683,39 @@ func Execute() {
 
 	// Group hosts by credential configuration to avoid re-counting
 	type credConfig struct {
-		user     string
-		password string
-		combo    string
-		service  string
+		User     string
+		Password string
+		Combo    string
+		Service  string
 	}
 
 	credCounts := make(map[credConfig]int)
 	hostsByConfig := make(map[credConfig][]modules.Host)
 
+	// Track which beta services we've warned about
+	warnedBetaServices := make(map[string]bool)
+
 	// First pass: group hosts by their credential configuration
 	for _, service := range supportedServices {
 		for _, h := range hostsList {
 			if h.Service == service {
-				for _, beta := range BetaServiceList {
-					if beta == h.Service {
-						modules.PrintWarningBeta(h.Service)
+				// Warn about beta services only once per service type
+				if !warnedBetaServices[h.Service] {
+					for _, beta := range BetaServiceList {
+						if beta == h.Service {
+							modules.PrintWarningBeta(h.Service)
+							warnedBetaServices[h.Service] = true
+							break
+						}
 					}
 				}
 
 				// Create config key
 				config := credConfig{
-					user:     *user,
-					password: *password,
-					combo:    *combo,
-					service:  service,
+					User:     *user,
+					Password: *password,
+					Combo:    *combo,
+					Service:  service,
 				}
 
 				hostsByConfig[config] = append(hostsByConfig[config], h)
@@ -716,6 +724,12 @@ func Execute() {
 	}
 
 	fmt.Fprintf(os.Stderr, "[*] Found %d unique credential configurations\n", len(hostsByConfig))
+
+	// Debug: Check if grouping worked correctly
+	if len(hostsByConfig) == len(hostsList) && len(hostsList) > 1 {
+		fmt.Fprintf(os.Stderr, "[WARNING] Grouping may have failed! Each host created a separate config.\n")
+		fmt.Fprintf(os.Stderr, "[WARNING] Configs: %d, Hosts: %d\n", len(hostsByConfig), len(hostsList))
+	}
 
 	// Second pass: count credentials once per configuration
 	totalCombinations := 0
@@ -727,18 +741,18 @@ func Execute() {
 		}
 
 		// Count ONCE for this configuration
-		isPasswordOnly := config.service == "vnc" || config.service == "snmp"
+		isPasswordOnly := config.Service == "vnc" || config.Service == "snmp"
 
 		var count int
 		if cachedCount, exists := credCounts[config]; exists {
 			count = cachedCount
-			fmt.Fprintf(os.Stderr, "[*] Using cached count for %s: %d credentials\n", config.service, count)
+			fmt.Fprintf(os.Stderr, "[*] Using cached count for %s: %d credentials\n", config.Service, count)
 		} else {
-			fmt.Fprintf(os.Stderr, "[*] Counting credentials for %s service...\n", config.service)
+			fmt.Fprintf(os.Stderr, "[*] Counting credentials for %s service...\n", config.Service)
 			// Use first host as representative (they all have same creds)
-			count = modules.CountCredentials(&hosts[0], config.user, config.password, config.combo, version, isPasswordOnly)
+			count = modules.CountCredentials(&hosts[0], config.User, config.Password, config.Combo, version, isPasswordOnly)
 			credCounts[config] = count
-			fmt.Fprintf(os.Stderr, "[*] %s: %d credentials per host\n", config.service, count)
+			fmt.Fprintf(os.Stderr, "[*] %s: %d credentials per host\n", config.Service, count)
 		}
 
 		// Multiply by number of hosts with this config
@@ -746,7 +760,7 @@ func Execute() {
 		totalCombinations += count * hostsCount
 
 		fmt.Fprintf(os.Stderr, "[*] %s: %d hosts × %d credentials = %d total\n",
-			config.service, hostsCount, count, count*hostsCount)
+			config.Service, hostsCount, count, count*hostsCount)
 	}
 
 	fmt.Fprintf(os.Stderr, "[*] Grand total: %d credential attempts across all hosts\n\n", totalCombinations)

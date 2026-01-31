@@ -168,7 +168,7 @@ func GetCredentialIterator(h *Host, user, password, combo, version string, isPas
 // CountCredentials counts total credentials without loading them all into memory
 func CountCredentials(h *Host, user, password, combo, version string, isPasswordOnly bool) int {
 	fmt.Fprintf(os.Stderr, "[*] Counting credentials for %s:%d...\n", h.Host, h.Port)
-	
+
 	count := 0
 
 	if combo != "" {
