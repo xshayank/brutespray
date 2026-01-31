@@ -66,6 +66,7 @@ Command: ```brutespray -H ssh://127.0.0.1 -C root:root```
 | `-nc` | Disable colored output | `-nc` |
 | `-summary` | Generate comprehensive summary report with statistics | `-summary` |
 | `-no-stats` | Disable statistics tracking for better performance | `-no-stats` |
+| `-no-chunking` | Disable automatic file chunking for large password lists (useful for testing) | `-no-chunking` |
 
 # Examples
 
@@ -258,6 +259,11 @@ user4:pass1
 - **Dynamic Performance Tracking**: Monitors response times and success rates
 - **Graceful Shutdown**: Proper cleanup and resource management
 - **Progress Tracking**: Real-time progress bars and status updates
+- **Large File Handling**: Automatic chunking of large password files (>1GB) into manageable pieces
+  - Files larger than 1GB are automatically split into 500MB chunks
+  - Chunks are processed sequentially to minimize memory usage
+  - Temporary chunk files are automatically cleaned up after use
+  - Use `-no-chunking` flag to disable automatic chunking if needed
 
 # Planned Features
 
