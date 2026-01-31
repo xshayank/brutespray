@@ -99,7 +99,7 @@ func (ci *CredentialIterator) initialize() error {
 				}
 				ci.userFile = file
 				ci.userScanner = bufio.NewScanner(file)
-				ci.userScanner.Buffer(make([]byte, 64*1024), 1024*1024) // 64KB buffer, 1MB max line length
+				ci.userScanner.Buffer(make([]byte, DefaultScannerBufferSize), MaxLineLength)
 				fmt.Fprintf(os.Stderr, "[DEBUG] User file opened successfully\n")
 			} else {
 				ci.users = []string{ci.user}
@@ -147,7 +147,7 @@ func (ci *CredentialIterator) initialize() error {
 				ci.passwordFile = file
 				ci.passwordFilePath = ci.password // Store path for potential reopening
 				ci.passScanner = bufio.NewScanner(file)
-				ci.passScanner.Buffer(make([]byte, 64*1024), 1024*1024) // 64KB buffer, 1MB max line length
+				ci.passScanner.Buffer(make([]byte, DefaultScannerBufferSize), MaxLineLength)
 				fmt.Fprintf(os.Stderr, "[DEBUG] Password file opened successfully\n")
 			}
 		} else {
@@ -198,7 +198,7 @@ func (ci *CredentialIterator) initializeCombo() error {
 			}
 			ci.comboFile = file
 			ci.comboScanner = bufio.NewScanner(file)
-			ci.comboScanner.Buffer(make([]byte, 64*1024), 1024*1024) // 64KB buffer, 1MB max line length
+			ci.comboScanner.Buffer(make([]byte, DefaultScannerBufferSize), MaxLineLength)
 			fmt.Fprintf(os.Stderr, "[DEBUG] Combo file opened successfully\n")
 		}
 	} else {
@@ -477,7 +477,7 @@ func (ci *CredentialIterator) resetPasswords() {
 				}
 			}
 			ci.passScanner = bufio.NewScanner(ci.passwordFile)
-			ci.passScanner.Buffer(make([]byte, 64*1024), 1024*1024) // 64KB buffer, 1MB max line length
+			ci.passScanner.Buffer(make([]byte, DefaultScannerBufferSize), MaxLineLength)
 		}
 	} else {
 		// Just reset index for slice-based passwords

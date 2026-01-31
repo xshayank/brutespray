@@ -17,6 +17,12 @@ const FileChunkSize = 500 * 1024 * 1024
 // Default: 1 GB
 const LargeFileThreshold = 1 * 1024 * 1024 * 1024
 
+// DefaultScannerBufferSize is the initial buffer size for scanners
+const DefaultScannerBufferSize = 64 * 1024 // 64 KB
+
+// MaxLineLength is the maximum length of a single line in input files
+const MaxLineLength = 1024 * 1024 // 1 MB
+
 // DisableFileChunking is a global flag to disable automatic file chunking
 var DisableFileChunking = false
 
@@ -86,7 +92,7 @@ func (cf *ChunkedFile) createChunks() error {
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
-	scanner.Buffer(make([]byte, 64*1024), 1024*1024) // 64KB buffer, 1MB max line length
+	scanner.Buffer(make([]byte, DefaultScannerBufferSize), MaxLineLength)
 
 	chunkIndex := 0
 	var currentChunk *os.File
@@ -207,7 +213,7 @@ func (ci *ChunkIterator) NextChunk() (*bufio.Scanner, bool) {
 
 	ci.currentFile = file
 	ci.scanner = bufio.NewScanner(file)
-	ci.scanner.Buffer(make([]byte, 64*1024), 1024*1024) // 64KB buffer, 1MB max line length
+	ci.scanner.Buffer(make([]byte, DefaultScannerBufferSize), MaxLineLength)
 
 	return ci.scanner, true
 }
@@ -237,7 +243,7 @@ func CountLinesInChunkedFile(cf *ChunkedFile) (int, error) {
 		}
 
 		scanner := bufio.NewScanner(file)
-		scanner.Buffer(make([]byte, 64*1024), 1024*1024)
+		scanner.Buffer(make([]byte, DefaultScannerBufferSize), MaxLineLength)
 		for scanner.Scan() {
 			count++
 		}
@@ -261,7 +267,7 @@ func ReadLinesFromChunkedFile(cf *ChunkedFile, callback func(string) error) erro
 		}
 
 		scanner := bufio.NewScanner(file)
-		scanner.Buffer(make([]byte, 64*1024), 1024*1024)
+		scanner.Buffer(make([]byte, DefaultScannerBufferSize), MaxLineLength)
 		
 		for scanner.Scan() {
 			if err := callback(scanner.Text()); err != nil {
