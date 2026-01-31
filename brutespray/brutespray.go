@@ -578,6 +578,7 @@ func Execute() {
 	printhosts := flag.Bool("P", false, "Print found hosts parsed from provided host and file arguments")
 	domain := flag.String("d", "", "Domain to use for RDP authentication (optional)")
 	noColor := flag.Bool("nc", false, "Disable colored output")
+	noChunking := flag.Bool("no-chunking", false, "Disable automatic file chunking for large password lists (useful for testing)")
 
 	flag.Parse()
 
@@ -585,6 +586,7 @@ func Execute() {
 	modules.NoColorMode = *noColor
 	modules.InsecureTLS = *insecureTLS
 	modules.Silent = *silent
+	modules.DisableFileChunking = *noChunking
 	if *logEvery < 1 {
 		*logEvery = 1
 	}

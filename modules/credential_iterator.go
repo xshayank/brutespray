@@ -28,6 +28,15 @@ type CredentialIterator struct {
 	// Store original file paths for reopening if needed
 	passwordFilePath string
 
+	// Chunked file support
+	passwordChunkedFile *ChunkedFile
+	passwordChunkIter   *ChunkIterator
+	userChunkedFile     *ChunkedFile
+	userChunkIter       *ChunkIterator
+	comboChunkedFile    *ChunkedFile
+	comboChunkIter      *ChunkIterator
+	currentChunkIndex   int
+
 	// Current values
 	currentUser     string
 	currentPassword string
@@ -106,16 +115,41 @@ func (ci *CredentialIterator) initialize() error {
 	if ci.password != "" {
 		if IsFile(ci.password) {
 			fmt.Fprintf(os.Stderr, "[DEBUG] Opening password file: %s\n", ci.password)
-			file, err := os.Open(ci.password)
+			
+			// Try to create chunked file for large password files
+			chunkedFile, err := NewChunkedFile(ci.password)
 			if err != nil {
 				ci.Close() // Clean up user file if opened
-				return fmt.Errorf("error opening password file: %w", err)
+				return fmt.Errorf("error creating chunked password file: %w", err)
 			}
-			ci.passwordFile = file
-			ci.passwordFilePath = ci.password // Store path for potential reopening
-			ci.passScanner = bufio.NewScanner(file)
-			ci.passScanner.Buffer(make([]byte, 64*1024), 1024*1024) // 64KB buffer, 1MB max line length
-			fmt.Fprintf(os.Stderr, "[DEBUG] Password file opened successfully\n")
+			
+			if chunkedFile.IsChunked {
+				// Use chunked file approach
+				fmt.Fprintf(os.Stderr, "[DEBUG] Using chunked password file with %d chunks\n", len(chunkedFile.ChunkPaths))
+				ci.passwordChunkedFile = chunkedFile
+				ci.passwordChunkIter = NewChunkIterator(chunkedFile)
+				ci.passwordFilePath = ci.password // Store original path
+				
+				// Get first chunk scanner
+				scanner, ok := ci.passwordChunkIter.NextChunk()
+				if !ok {
+					ci.Close()
+					return fmt.Errorf("failed to get first password chunk")
+				}
+				ci.passScanner = scanner
+			} else {
+				// Use regular file approach
+				file, err := os.Open(ci.password)
+				if err != nil {
+					ci.Close() // Clean up user file if opened
+					return fmt.Errorf("error opening password file: %w", err)
+				}
+				ci.passwordFile = file
+				ci.passwordFilePath = ci.password // Store path for potential reopening
+				ci.passScanner = bufio.NewScanner(file)
+				ci.passScanner.Buffer(make([]byte, 64*1024), 1024*1024) // 64KB buffer, 1MB max line length
+				fmt.Fprintf(os.Stderr, "[DEBUG] Password file opened successfully\n")
+			}
 		} else {
 			ci.passwords = []string{ci.password}
 		}
@@ -137,14 +171,36 @@ func (ci *CredentialIterator) initialize() error {
 func (ci *CredentialIterator) initializeCombo() error {
 	if IsFile(ci.combo) {
 		fmt.Fprintf(os.Stderr, "[DEBUG] Opening combo file: %s\n", ci.combo)
-		file, err := os.Open(ci.combo)
+		
+		// Try to create chunked file for large combo files
+		chunkedFile, err := NewChunkedFile(ci.combo)
 		if err != nil {
-			return fmt.Errorf("error opening combo file: %w", err)
+			return fmt.Errorf("error creating chunked combo file: %w", err)
 		}
-		ci.comboFile = file
-		ci.comboScanner = bufio.NewScanner(file)
-		ci.comboScanner.Buffer(make([]byte, 64*1024), 1024*1024) // 64KB buffer, 1MB max line length
-		fmt.Fprintf(os.Stderr, "[DEBUG] Combo file opened successfully\n")
+		
+		if chunkedFile.IsChunked {
+			// Use chunked file approach
+			fmt.Fprintf(os.Stderr, "[DEBUG] Using chunked combo file with %d chunks\n", len(chunkedFile.ChunkPaths))
+			ci.comboChunkedFile = chunkedFile
+			ci.comboChunkIter = NewChunkIterator(chunkedFile)
+			
+			// Get first chunk scanner
+			scanner, ok := ci.comboChunkIter.NextChunk()
+			if !ok {
+				return fmt.Errorf("failed to get first combo chunk")
+			}
+			ci.comboScanner = scanner
+		} else {
+			// Use regular file approach
+			file, err := os.Open(ci.combo)
+			if err != nil {
+				return fmt.Errorf("error opening combo file: %w", err)
+			}
+			ci.comboFile = file
+			ci.comboScanner = bufio.NewScanner(file)
+			ci.comboScanner.Buffer(make([]byte, 64*1024), 1024*1024) // 64KB buffer, 1MB max line length
+			fmt.Fprintf(os.Stderr, "[DEBUG] Combo file opened successfully\n")
+		}
 	} else {
 		// Single combo value
 		splits := strings.SplitN(ci.combo, ":", 2)
@@ -187,25 +243,41 @@ func (ci *CredentialIterator) Next() (user, password string, ok bool) {
 // nextCombo returns next credential in combo mode
 func (ci *CredentialIterator) nextCombo() (user, password string, ok bool) {
 	if ci.comboScanner != nil {
-		// Reading from file
-		for ci.comboScanner.Scan() {
-			line := ci.comboScanner.Text()
-			splits := strings.SplitN(line, ":", 2)
-			if len(splits) == 2 {
-				return splits[0], splits[1], true
-			} else {
-				// Skip invalid lines with a warning instead of terminating
-				fmt.Fprintf(os.Stderr, "[WARNING] Skipping invalid format in combo file: %s\n", line)
-				continue
+		// Reading from file or chunks
+		for {
+			if ci.comboScanner.Scan() {
+				line := ci.comboScanner.Text()
+				splits := strings.SplitN(line, ":", 2)
+				if len(splits) == 2 {
+					return splits[0], splits[1], true
+				} else {
+					// Skip invalid lines with a warning instead of terminating
+					fmt.Fprintf(os.Stderr, "[WARNING] Skipping invalid format in combo file: %s\n", line)
+					continue
+				}
 			}
-		}
-		if err := ci.comboScanner.Err(); err != nil {
-			fmt.Fprintf(os.Stderr, "[ERROR] Error reading combo file: %v\n", err)
-		} else {
+			
+			// Check for scanner error
+			if err := ci.comboScanner.Err(); err != nil {
+				fmt.Fprintf(os.Stderr, "[ERROR] Error reading combo file: %v\n", err)
+				ci.done = true
+				return "", "", false
+			}
+			
+			// If using chunks, try to move to next chunk
+			if ci.comboChunkIter != nil {
+				scanner, ok := ci.comboChunkIter.NextChunk()
+				if ok {
+					ci.comboScanner = scanner
+					continue // Try reading from new chunk
+				}
+			}
+			
+			// No more data
 			fmt.Fprintf(os.Stderr, "[DEBUG] Reached end of combo file\n")
+			ci.done = true
+			return "", "", false
 		}
-		ci.done = true
-		return "", "", false
 	}
 
 	// Single combo value
@@ -223,15 +295,29 @@ func (ci *CredentialIterator) nextCombo() (user, password string, ok bool) {
 // nextPasswordOnly returns next password for password-only services
 func (ci *CredentialIterator) nextPasswordOnly() (user, password string, ok bool) {
 	if ci.passScanner != nil {
-		// Reading from file
+		// Reading from file or chunks
 		if ci.passScanner.Scan() {
 			return "", ci.passScanner.Text(), true
 		}
+		
+		// Check for scanner error
 		if err := ci.passScanner.Err(); err != nil {
 			fmt.Fprintf(os.Stderr, "[ERROR] Error reading password file: %v\n", err)
-		} else {
-			fmt.Fprintf(os.Stderr, "[DEBUG] Reached end of password file\n")
+			ci.done = true
+			return "", "", false
 		}
+		
+		// If using chunks, try to move to next chunk
+		if ci.passwordChunkIter != nil {
+			scanner, ok := ci.passwordChunkIter.NextChunk()
+			if ok {
+				ci.passScanner = scanner
+				// Recursively try reading from new chunk
+				return ci.nextPasswordOnly()
+			}
+		}
+		
+		fmt.Fprintf(os.Stderr, "[DEBUG] Reached end of password file\n")
 		ci.done = true
 		return "", "", false
 	}
@@ -310,16 +396,29 @@ func (ci *CredentialIterator) nextUser() bool {
 // nextPassword advances to the next password
 func (ci *CredentialIterator) nextPassword() bool {
 	if ci.passScanner != nil {
-		// Reading from file
+		// Reading from file or chunks
 		if ci.passScanner.Scan() {
 			ci.currentPassword = ci.passScanner.Text()
 			return true
 		}
+		
+		// Check for scanner error
 		if err := ci.passScanner.Err(); err != nil {
 			fmt.Fprintf(os.Stderr, "[ERROR] Error reading password file: %v\n", err)
-		} else {
-			fmt.Fprintf(os.Stderr, "[DEBUG] Reached end of password file\n")
+			return false
 		}
+		
+		// If using chunks, try to move to next chunk
+		if ci.passwordChunkIter != nil {
+			scanner, ok := ci.passwordChunkIter.NextChunk()
+			if ok {
+				ci.passScanner = scanner
+				// Recursively try reading from new chunk
+				return ci.nextPassword()
+			}
+		}
+		
+		fmt.Fprintf(os.Stderr, "[DEBUG] Reached end of password file\n")
 		return false
 	}
 
@@ -336,6 +435,26 @@ func (ci *CredentialIterator) nextPassword() bool {
 // resetPasswords resets password iteration to start
 func (ci *CredentialIterator) resetPasswords() {
 	if ci.passScanner != nil {
+		// For chunked files, recreate the chunk iterator
+		if ci.passwordChunkIter != nil {
+			// Close current iterator
+			if ci.passwordChunkIter.currentFile != nil {
+				ci.passwordChunkIter.currentFile.Close()
+			}
+			
+			// Create new chunk iterator and get first chunk
+			ci.passwordChunkIter = NewChunkIterator(ci.passwordChunkedFile)
+			scanner, ok := ci.passwordChunkIter.NextChunk()
+			if !ok {
+				fmt.Fprintf(os.Stderr, "Error resetting chunked password file\n")
+				ci.done = true
+				return
+			}
+			ci.passScanner = scanner
+			ci.currentPassword = ""
+			return
+		}
+		
 		// For file-based passwords, seek back to beginning if possible
 		if ci.passwordFile != nil {
 			_, err := ci.passwordFile.Seek(0, 0)
@@ -377,6 +496,14 @@ func (ci *CredentialIterator) Close() error {
 		}
 		ci.userFile = nil
 	}
+	
+	// Clean up user chunks
+	if ci.userChunkIter != nil {
+		if err := ci.userChunkIter.Close(); err != nil {
+			errors = append(errors, fmt.Errorf("error closing user chunk iterator: %w", err))
+		}
+		ci.userChunkIter = nil
+	}
 
 	if ci.passwordFile != nil {
 		if err := ci.passwordFile.Close(); err != nil {
@@ -384,12 +511,28 @@ func (ci *CredentialIterator) Close() error {
 		}
 		ci.passwordFile = nil
 	}
+	
+	// Clean up password chunks
+	if ci.passwordChunkIter != nil {
+		if err := ci.passwordChunkIter.Close(); err != nil {
+			errors = append(errors, fmt.Errorf("error closing password chunk iterator: %w", err))
+		}
+		ci.passwordChunkIter = nil
+	}
 
 	if ci.comboFile != nil {
 		if err := ci.comboFile.Close(); err != nil {
 			errors = append(errors, fmt.Errorf("error closing combo file: %w", err))
 		}
 		ci.comboFile = nil
+	}
+	
+	// Clean up combo chunks
+	if ci.comboChunkIter != nil {
+		if err := ci.comboChunkIter.Close(); err != nil {
+			errors = append(errors, fmt.Errorf("error closing combo chunk iterator: %w", err))
+		}
+		ci.comboChunkIter = nil
 	}
 
 	if len(errors) > 0 {
