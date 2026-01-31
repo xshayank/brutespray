@@ -167,11 +167,14 @@ func GetCredentialIterator(h *Host, user, password, combo, version string, isPas
 
 // CountCredentials counts total credentials without loading them all into memory
 func CountCredentials(h *Host, user, password, combo, version string, isPasswordOnly bool) int {
+	fmt.Fprintf(os.Stderr, "[*] Counting credentials for %s:%d...\n", h.Host, h.Port)
+	
 	count := 0
 
 	if combo != "" {
 		// Count combo credentials
 		if IsFile(combo) {
+			fmt.Fprintf(os.Stderr, "[*] Counting combo file: %s\n", combo)
 			file, err := os.Open(combo)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error opening combo file for counting: %v\n", err)
@@ -186,12 +189,16 @@ func CountCredentials(h *Host, user, password, combo, version string, isPassword
 				splits := strings.SplitN(line, ":", 2)
 				if len(splits) == 2 {
 					count++ // Only count valid combo lines
+					if count%100000 == 0 {
+						fmt.Fprintf(os.Stderr, "[*] Counted %d combo lines so far...\n", count)
+					}
 				}
 			}
 			if err := scanner.Err(); err != nil {
 				fmt.Fprintf(os.Stderr, "Error reading combo file for counting: %v\n", err)
 				return 0
 			}
+			fmt.Fprintf(os.Stderr, "[*] Total combo lines: %d\n", count)
 		} else {
 			count = 1 // Single combo value
 		}
@@ -204,6 +211,7 @@ func CountCredentials(h *Host, user, password, combo, version string, isPassword
 		userCount = 1 // Password-only services use empty user
 	} else if user != "" {
 		if IsFile(user) {
+			fmt.Fprintf(os.Stderr, "[*] Counting user file: %s\n", user)
 			file, err := os.Open(user)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error opening user file for counting: %v\n", err)
@@ -215,11 +223,15 @@ func CountCredentials(h *Host, user, password, combo, version string, isPassword
 			scanner.Buffer(make([]byte, DefaultScannerBufferSize), MaxLineLength)
 			for scanner.Scan() {
 				userCount++
+				if userCount%10000 == 0 {
+					fmt.Fprintf(os.Stderr, "[*] Counted %d users so far...\n", userCount)
+				}
 			}
 			if err := scanner.Err(); err != nil {
 				fmt.Fprintf(os.Stderr, "Error reading user file for counting: %v\n", err)
 				return 0
 			}
+			fmt.Fprintf(os.Stderr, "[*] Total users: %d\n", userCount)
 		} else {
 			userCount = 1 // Single user value
 		}
@@ -227,12 +239,14 @@ func CountCredentials(h *Host, user, password, combo, version string, isPassword
 		// Use default wordlist
 		users := GetUsersFromDefaultWordlist(version, h.Service)
 		userCount = len(users)
+		fmt.Fprintf(os.Stderr, "[*] Using default user wordlist: %d users\n", userCount)
 	}
 
 	// Count passwords
 	passCount := 0
 	if password != "" {
 		if IsFile(password) {
+			fmt.Fprintf(os.Stderr, "[*] Counting password file: %s (this may take a while for large files)\n", password)
 			file, err := os.Open(password)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error opening password file for counting: %v\n", err)
@@ -244,11 +258,15 @@ func CountCredentials(h *Host, user, password, combo, version string, isPassword
 			scanner.Buffer(make([]byte, DefaultScannerBufferSize), MaxLineLength)
 			for scanner.Scan() {
 				passCount++
+				if passCount%100000 == 0 {
+					fmt.Fprintf(os.Stderr, "[*] Counted %d passwords so far...\n", passCount)
+				}
 			}
 			if err := scanner.Err(); err != nil {
 				fmt.Fprintf(os.Stderr, "Error reading password file for counting: %v\n", err)
 				return 0
 			}
+			fmt.Fprintf(os.Stderr, "[*] Total passwords: %d\n", passCount)
 		} else {
 			passCount = 1 // Single password value
 		}
@@ -259,8 +277,11 @@ func CountCredentials(h *Host, user, password, combo, version string, isPassword
 			// Use default wordlist
 			passwords := GetPasswordsFromDefaultWordlist(version, h.Service)
 			passCount = len(passwords)
+			fmt.Fprintf(os.Stderr, "[*] Using default password wordlist: %d passwords\n", passCount)
 		}
 	}
 
+	fmt.Fprintf(os.Stderr, "[*] Total combinations for %s:%d = %d users × %d passwords = %d\n",
+		h.Host, h.Port, userCount, passCount, userCount*passCount)
 	return userCount * passCount
 }

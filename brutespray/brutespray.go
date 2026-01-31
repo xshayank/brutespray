@@ -678,6 +678,9 @@ func Execute() {
 
 	supportedServices := getSupportedServices(*serviceType)
 
+	fmt.Fprintln(os.Stderr, "\n[*] Calculating total credentials to test...")
+	fmt.Fprintf(os.Stderr, "[*] Processing %d hosts with service filter: %s\n", len(hostsList), *serviceType)
+
 	totalCombinations := 0
 	nopassServices := 0
 	for _, service := range supportedServices {
@@ -695,6 +698,9 @@ func Execute() {
 			}
 		}
 	}
+
+	fmt.Fprintf(os.Stderr, "[*] Total combinations calculated: %d\n", totalCombinations)
+	fmt.Fprintln(os.Stderr, "[*] Starting attack...")
 
 	// Validate threads per host (no upper limit)
 	if *threads < 1 {
