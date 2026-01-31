@@ -17,7 +17,7 @@ func TestFileChunking(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	testFile := filepath.Join(tmpDir, "test_passwords.txt")
-	
+
 	// Create a test file with known content
 	f, err := os.Create(testFile)
 	if err != nil {
@@ -37,11 +37,11 @@ func TestFileChunking(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create chunked file with chunking disabled: %v", err)
 	}
-	
+
 	if cf1.IsChunked {
 		t.Error("Expected file not to be chunked when DisableFileChunking is true")
 	}
-	
+
 	if len(cf1.ChunkPaths) != 1 || cf1.ChunkPaths[0] != testFile {
 		t.Errorf("Expected single chunk path to be original file, got %v", cf1.ChunkPaths)
 	}
@@ -80,7 +80,7 @@ func TestChunkIterator(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	testFile := filepath.Join(tmpDir, "test_passwords.txt")
-	
+
 	// Create a test file
 	f, err := os.Create(testFile)
 	if err != nil {

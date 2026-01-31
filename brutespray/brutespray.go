@@ -691,7 +691,7 @@ func Execute() {
 
 	credCounts := make(map[credConfig]int)
 	hostsByConfig := make(map[credConfig][]modules.Host)
-	
+
 	// Track which beta services we've warned about
 	warnedBetaServices := make(map[string]bool)
 
@@ -724,7 +724,7 @@ func Execute() {
 	}
 
 	fmt.Fprintf(os.Stderr, "[*] Found %d unique credential configurations\n", len(hostsByConfig))
-	
+
 	// Debug: Check if grouping worked correctly
 	if len(hostsByConfig) == len(hostsList) && len(hostsList) > 1 {
 		fmt.Fprintf(os.Stderr, "[WARNING] Grouping may have failed! Each host created a separate config.\n")

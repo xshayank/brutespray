@@ -6,7 +6,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/xshayank/brutespray/modules" // Assuming this package is available
 	"github.com/x90skysn3k/grdp/core"
 	"github.com/x90skysn3k/grdp/glog"
 	"github.com/x90skysn3k/grdp/protocol/nla"
@@ -15,6 +14,7 @@ import (
 	"github.com/x90skysn3k/grdp/protocol/t125"
 	"github.com/x90skysn3k/grdp/protocol/tpkt"
 	"github.com/x90skysn3k/grdp/protocol/x224"
+	"github.com/xshayank/brutespray/modules" // Assuming this package is available
 )
 
 func BruteRDP(host string, port int, user, password string, timeout time.Duration, cm *modules.ConnectionManager, domain string) (bool, bool) {
