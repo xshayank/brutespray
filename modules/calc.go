@@ -184,16 +184,14 @@ func CountCredentials(h *Host, user, password, combo, version string, isPassword
 
 			scanner := bufio.NewScanner(file)
 			scanner.Buffer(make([]byte, DefaultScannerBufferSize), MaxLineLength)
-			lineCount := 0
 			for scanner.Scan() {
 				line := scanner.Text()
 				splits := strings.SplitN(line, ":", 2)
 				if len(splits) == 2 {
 					count++ // Only count valid combo lines
-				}
-				lineCount++
-				if lineCount%100000 == 0 {
-					fmt.Fprintf(os.Stderr, "[*] Counted %d combo lines so far...\n", lineCount)
+					if count%100000 == 0 {
+						fmt.Fprintf(os.Stderr, "[*] Counted %d combo lines so far...\n", count)
+					}
 				}
 			}
 			if err := scanner.Err(); err != nil {
