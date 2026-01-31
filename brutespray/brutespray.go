@@ -681,8 +681,18 @@ func Execute() {
 	fmt.Fprintln(os.Stderr, "\n[*] Calculating total credentials to test...")
 	fmt.Fprintf(os.Stderr, "[*] Processing %d hosts with service filter: %s\n", len(hostsList), *serviceType)
 
-	totalCombinations := 0
-	nopassServices := 0
+	// Group hosts by credential configuration to avoid re-counting
+	type credConfig struct {
+		user     string
+		password string
+		combo    string
+		service  string
+	}
+
+	credCounts := make(map[credConfig]int)
+	hostsByConfig := make(map[credConfig][]modules.Host)
+
+	// First pass: group hosts by their credential configuration
 	for _, service := range supportedServices {
 		for _, h := range hostsList {
 			if h.Service == service {
@@ -691,15 +701,55 @@ func Execute() {
 						modules.PrintWarningBeta(h.Service)
 					}
 				}
-				// Use iterator-based counting to avoid loading all credentials into memory
-				isPasswordOnly := service == "vnc" || service == "snmp"
-				count := modules.CountCredentials(&h, *user, *password, *combo, version, isPasswordOnly)
-				totalCombinations += count
+
+				// Create config key
+				config := credConfig{
+					user:     *user,
+					password: *password,
+					combo:    *combo,
+					service:  service,
+				}
+
+				hostsByConfig[config] = append(hostsByConfig[config], h)
 			}
 		}
 	}
 
-	fmt.Fprintf(os.Stderr, "[*] Total combinations calculated: %d\n", totalCombinations)
+	fmt.Fprintf(os.Stderr, "[*] Found %d unique credential configurations\n", len(hostsByConfig))
+
+	// Second pass: count credentials once per configuration
+	totalCombinations := 0
+	nopassServices := 0
+
+	for config, hosts := range hostsByConfig {
+		if len(hosts) == 0 {
+			continue
+		}
+
+		// Count ONCE for this configuration
+		isPasswordOnly := config.service == "vnc" || config.service == "snmp"
+
+		var count int
+		if cachedCount, exists := credCounts[config]; exists {
+			count = cachedCount
+			fmt.Fprintf(os.Stderr, "[*] Using cached count for %s: %d credentials\n", config.service, count)
+		} else {
+			fmt.Fprintf(os.Stderr, "[*] Counting credentials for %s service...\n", config.service)
+			// Use first host as representative (they all have same creds)
+			count = modules.CountCredentials(&hosts[0], config.user, config.password, config.combo, version, isPasswordOnly)
+			credCounts[config] = count
+			fmt.Fprintf(os.Stderr, "[*] %s: %d credentials per host\n", config.service, count)
+		}
+
+		// Multiply by number of hosts with this config
+		hostsCount := len(hosts)
+		totalCombinations += count * hostsCount
+
+		fmt.Fprintf(os.Stderr, "[*] %s: %d hosts × %d credentials = %d total\n",
+			config.service, hostsCount, count, count*hostsCount)
+	}
+
+	fmt.Fprintf(os.Stderr, "[*] Grand total: %d credential attempts across all hosts\n\n", totalCombinations)
 	fmt.Fprintln(os.Stderr, "[*] Starting attack...")
 
 	// Validate threads per host (no upper limit)
