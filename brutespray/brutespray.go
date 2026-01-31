@@ -700,7 +700,7 @@ func Execute() {
 	}
 
 	fmt.Fprintf(os.Stderr, "[*] Total combinations calculated: %d\n", totalCombinations)
-	fmt.Fprintln(os.Stderr, "[*] Starting attack...\n")
+	fmt.Fprintln(os.Stderr, "[*] Starting attack...")
 
 	// Validate threads per host (no upper limit)
 	if *threads < 1 {
